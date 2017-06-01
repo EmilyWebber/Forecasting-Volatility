@@ -12,17 +12,17 @@ from keras.layers.core import Dense, Activation, Dropout
 from keras.layers.recurrent import LSTM
 from keras.models import Sequential
 import pandas as pd
-from clean_sp_data import get_merged_data
+from clean_sp_data import get_merged_data, stream_rows,get_ordered_vix
 
 # define a function to convert a vector of time series into a 2D matrix
 def convertSeriesToMatrix(vectorSeries, sequence_length):
     matrix=[]
-    vectorSeries = vectorSeries.as_matrix()[1:]
-    for i in range(len(vectorSeries)-sequence_length+1):
+
+    vectorSeries = list(vectorSeries.as_matrix()[1:])
+
+    for i in range(len(vectorSeries) - sequence_length+1):
 
     	subset = vectorSeries[i : i + sequence_length]
-
-    	# print len(subset), subset[0]
 
         matrix.append(subset)
 
@@ -38,13 +38,13 @@ def store_as_vector(path):
 	        vector_vix.append(float(fields[6]))
 	return vector_vix
 
-def plot_and_save(y_test, shifted_value, predicted_values):
+def plot_and_save(y_test, shifted_value, predicted_values, asset):
 	# plot the results
 	fig = plt.figure()
 	plt.plot(y_test + shifted_value)
 	plt.plot(predicted_values + shifted_value)
 	plt.xlabel('Date')
-	plt.ylabel('VIX')
+	plt.ylabel('{}'.format(asset))
 	plt.show()
 	fig.savefig('output_prediction.jpg', bbox_inches='tight')
 
@@ -71,41 +71,33 @@ def build_the_model():
 	return model
 
 
-
-if __name__ == "__main__":
-
-	# random seed
-	np.random.seed(1234)
-
-	# load the data
-	path_to_vix = '../Data/vix_2005_2016.csv'
-	path_to_sp = "../Data/sp_2005_2016.csv"
-
-	sequence_length = 20
-
-	df = get_merged_data(path_to_sp, path_to_vix)
-
-	# convert the vector to a 2D matrix
-	matrix_vix = convertSeriesToMatrix(df, sequence_length)
-
+def subtract_the_mean(matrix_vix):
 	# shift all data by mean
 	matrix_vix = np.array(matrix_vix)
 	shifted_value = matrix_vix.mean()
 	matrix_vix -= shifted_value
 	print "Data  shape: ", matrix_vix.shape
+	return matrix_vix, shifted_value
+
+def predict(df, sequence_length, asset):
+ 	# convert the vector to a 2D matrix
+	matrix_vix = convertSeriesToMatrix(df, sequence_length)
+
+	matrix_vix, shifted_value = subtract_the_mean(matrix_vix)
 
 	# split dataset: 90% for training and 10% for testing
 	train_row = int(round(0.9 * matrix_vix.shape[0]))
 	train_set = matrix_vix[:train_row, :]
 
 	# shuffle the training set (but do not shuffle the test set)
-	# to build a model that is not dependent on the sequence? but aren't we attempting to model the sequence?
+	# to build a model that is not dependent on the data collection process
 	np.random.shuffle(train_set)
 
 	# the training set
 	X_train = train_set[:, :-1]
 	# the last column is the true value to compute the mean-squared-error loss
 	y_train = train_set[:, -1]
+
 	# the test set
 	X_test = matrix_vix[train_row:, :-1]
 	y_test = matrix_vix[train_row:, -1]
@@ -116,19 +108,36 @@ if __name__ == "__main__":
 
 	model = build_the_model()
 
-	# # train the model
-	# model.fit(X_train, y_train, batch_size=512, nb_epoch=50, validation_split=0.05, verbose=1)
+	# train the model
+	model.fit(X_train, y_train, batch_size=512, nb_epoch=50, validation_split=0.05, verbose=1)
 
 	# # evaluate the result
-	# test_mse = model.evaluate(X_test, y_test, verbose=1)
+	test_mse = model.evaluate(X_test, y_test, verbose=1)
 
-	# # print "Full value of test_mse is {}".format(test_mse)
+	# print "Full value of test_mse is {}".format(test_mse)
 
-	# print '\nThe mean squared error (MSE) on the test data set is %.3f over %d test samples.' % (test_mse, len(y_test))
+	print '\nThe mean squared error (MSE) on the test data set is %.3f over %d test samples.' % (test_mse, len(y_test))
 
-	# # get the predicted values
-	# predicted_values = model.predict(X_test)
-	# num_test_samples = len(predicted_values)
-	# predicted_values = np.reshape(predicted_values, (num_test_samples,1))
+	# get the predicted values
+	predicted_values = model.predict(X_test)
+	num_test_samples = len(predicted_values)
+	predicted_values = np.reshape(predicted_values, (num_test_samples,1))
 
-	# plot_and_save(y_test, shifted_value, predicted_values)
+	plot_and_save(y_test, shifted_value, predicted_values, asset)
+
+if __name__ == "__main__":
+
+	# random seed
+	np.random.seed(1234)
+
+	# load the data
+	path_to_vix = '../Data/vix_2005_2016.csv'
+	path_to_sp = "../Data/sp_2005_2016.csv"
+
+	sp = stream_rows(path_to_sp)
+
+	vx = get_ordered_vix()
+
+	predict(vx, 20, "VIX")
+
+	# predict(sp["Adj Close_SP"], 20, "S&P")

@@ -1,32 +1,42 @@
 import pandas as pd
 import csv
 
+# read in the sp data
 def stream_rows(p):
 	rt = []
 	with open(p, "rU") as f:
 		reader = csv.reader(f)
 		header = next(reader)
 		for row in reader:
+
 			try:
-				l = [float(i) for i in row[1:]]
-				l.insert(0, row[0])
+				# grab the date and vix from the spreadsheet, and convert to a float
+				l = [row[0], float(row[5])]
+
+				# add the new row to the array
+				rt.insert(0, l)
+
 			except:
-				print "Error in sp data, skipping this row"
-			rt.insert(0, l)
-		rt.insert(0, header)
-	df = pd.DataFrame(rt, columns=["Date", "Open_SP", "High_SP", "Low_SP", "Close_SP", "Adj Close_SP", "Volume_SP"])
+				print "Empty row here"
+
+	for each in rt:
+		if len(each) != 2:
+			print each
+
+	# transform into a data frame
+	df = pd.DataFrame(rt, columns=["Date", "Adj Close_SP"])
 	return df
 
+# read the vix data into a 1D list of data points
 def read_vix(p):
 	with open(p, "rU") as f:
 		reader = csv.reader(f)
 		header = next(reader)
-		rt = [header]
+		rt = []
 		for row in reader:
-			l = [float(i) for i in row[1:]]
-			l.insert(0, row[0])
+			l = [row[0], float(row[6])]
 			rt.append(l)
-	df = pd.DataFrame(rt, columns = ["Date", "Open_VIX", "High_VIX", "Low_VIX", "Close_VIX", "Volume_VIX", "Adj Close_VIX"])
+	df = pd.DataFrame(rt, columns = ["Date", "Adj Close_VIX"])
 	return df
 
 def check_length(sp, vix):
@@ -52,6 +62,17 @@ def get_merged_data(p1, p2):
 	return join(sp, vix)
 
 
+def get_ordered_vix():
+	sp = stream_rows("../Data/sp_2005_2016.csv")
+
+	vix = read_vix("../Data/vix_2005_2016.csv")
+
+	# check_length(sp, vix)
+
+	df = join(sp, vix)
+
+	return df["Adj Close_VIX"]
+
 
 if __name__ == "__main__":
 	sp = stream_rows("../Data/sp_2005_2016.csv")
@@ -61,3 +82,5 @@ if __name__ == "__main__":
 	# check_length(sp, vix)
 
 	df = join(sp, vix)
+
+	print df["Adj Close_VIX"]
