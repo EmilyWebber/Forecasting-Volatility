@@ -5,6 +5,8 @@ The data set:
 Historical data for VOLATILITY S&P 500 (^VIX) from Jan. 02, 2005 to Sep. 26, 2016, which can downloaded from
 https://ca.finance.yahoo.com/q/hp?a=&b=&c=&d=8&e=27&f=2016&g=d&s=%5Evix&ql=1
 '''
+import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import numpy as np
 import time
@@ -12,7 +14,7 @@ from keras.layers.core import Dense, Activation, Dropout
 from keras.layers.recurrent import LSTM
 from keras.models import Sequential
 import pandas as pd
-from clean_sp_data import get_merged_data, stream_rows,get_ordered_vix
+from clean_sp_data import get_merged_data, read_sp, get_ordered_series
 
 # define a function to convert a vector of time series into a 2D matrix
 def convertSeriesToMatrix(vectorSeries, sequence_length):
@@ -79,7 +81,9 @@ def subtract_the_mean(matrix_vix):
 	print "Data  shape: ", matrix_vix.shape
 	return matrix_vix, shifted_value
 
+
 def predict(df, sequence_length, asset):
+
  	# convert the vector to a 2D matrix
 	matrix_vix = convertSeriesToMatrix(df, sequence_length)
 
@@ -87,6 +91,7 @@ def predict(df, sequence_length, asset):
 
 	# split dataset: 90% for training and 10% for testing
 	train_row = int(round(0.9 * matrix_vix.shape[0]))
+
 	train_set = matrix_vix[:train_row, :]
 
 	# shuffle the training set (but do not shuffle the test set)
@@ -95,6 +100,7 @@ def predict(df, sequence_length, asset):
 
 	# the training set
 	X_train = train_set[:, :-1]
+
 	# the last column is the true value to compute the mean-squared-error loss
 	y_train = train_set[:, -1]
 
@@ -125,19 +131,16 @@ def predict(df, sequence_length, asset):
 
 	plot_and_save(y_test, shifted_value, predicted_values, asset)
 
+
 if __name__ == "__main__":
 
 	# random seed
 	np.random.seed(1234)
 
-	# load the data
-	path_to_vix = '../Data/vix_2005_2016.csv'
-	path_to_sp = "../Data/sp_2005_2016.csv"
+	sp = get_ordered_series('SP')
 
-	sp = stream_rows(path_to_sp)
+	vx = get_ordered_series("VIX")
 
-	vx = get_ordered_vix()
+	# predict(vx, 20, "VIX")
 
-	predict(vx, 20, "VIX")
-
-	# predict(sp["Adj Close_SP"], 20, "S&P")
+	predict(sp, 20, "S&P")

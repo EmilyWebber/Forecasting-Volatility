@@ -2,7 +2,7 @@ import pandas as pd
 import csv
 
 # read in the sp data
-def stream_rows(p):
+def read_sp(p):
 	rt = []
 	with open(p, "rU") as f:
 		reader = csv.reader(f)
@@ -39,48 +39,46 @@ def read_vix(p):
 	df = pd.DataFrame(rt, columns = ["Date", "Adj Close_VIX"])
 	return df
 
-def check_length(sp, vix):
-	print "Length of sp is {}".format(len(sp))
-	print "Length of vix is {}".format(len(vix))
-	df.set_index(["Date"])
-
 def join(sp, vix):
-	sp = sp.set_index(["Date"])
-	vix = vix.set_index(["Date"])
-	# sp.join(vix, on = "Date")
+
+	sp = sp.set_index(pd.DatetimeIndex(sp["Date"]))
+	sp = sp.sort_index(ascending=True)
+
+	vix = vix.set_index(pd.DatetimeIndex(vix["Date"]))
+	vix = vix.sort_index(ascending=True)
+
 	rt = pd.concat([sp, vix], axis=1, join_axes=[sp.index])
+
 	return rt
 
 
 def get_merged_data(p1, p2):
-	sp = stream_rows(p1)
+	sp = read_sp(p1)
 
 	vix = read_vix(p2)
-
-	# check_length(sp, vix)
 
 	return join(sp, vix)
 
 
-def get_ordered_vix():
-	sp = stream_rows("../Data/sp_2005_2016.csv")
+def get_ordered_series(series_name):
+	sp = read_sp("../Data/sp_2005_2016.csv")
 
 	vix = read_vix("../Data/vix_2005_2016.csv")
 
-	# check_length(sp, vix)
-
 	df = join(sp, vix)
 
-	return df["Adj Close_VIX"]
+	if "VIX" in series_name:
+		return df["Adj Close_VIX"]
+
+	elif "SP" in series_name:
+		return df["Adj Close_SP"]
 
 
 if __name__ == "__main__":
-	sp = stream_rows("../Data/sp_2005_2016.csv")
+	sp = read_sp("../Data/sp_2005_2016.csv")
 
-	vix = read_vix("../Data/vix_2005_2016.csv")
+	vx = read_vix("../Data/vix_2005_2016.csv")
 
-	# check_length(sp, vix)
+	df = join(sp, vx)
 
-	df = join(sp, vix)
-
-	print df["Adj Close_VIX"]
+	print df.head()
