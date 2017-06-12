@@ -1,3 +1,4 @@
+from __future__ import division
 '''
 This program aims to predict VOLATILITY S&P 500 (^VIX) time series using LTSM.
 
@@ -41,7 +42,6 @@ def store_as_vector(path):
 	return vector_vix
 
 def plot_and_save(y_test, shifted_value, predicted_values, asset):
-	# plot the results
 	fig = plt.figure()
 	plt.plot(y_test + shifted_value)
 	plt.plot(predicted_values + shifted_value)
@@ -55,9 +55,24 @@ def plot_and_save(y_test, shifted_value, predicted_values, asset):
 	np.savetxt('output_result.txt', test_result)
 
 
-def build_the_model():
+def build_the_model(asset):
 	# build the model
 	model = Sequential()
+
+	if "S&P" in asset:
+		# layer 1: LSTM
+		model.add(LSTM(input_dim=1, output_dim=50, return_sequences=True))
+		model.add(Dropout(0.2))
+		# layer 2: LSTM
+		model.add(LSTM(output_dim=100, return_sequences=False))
+		model.add(Dropout(0.2))
+		# layer 3: dense
+		# linear activation: a(x) = x
+		model.add(Dense(output_dim=1, activation='relu'))
+		# compile the model
+		model.compile(loss="mse", optimizer="rmsprop")
+		return model
+
 	# layer 1: LSTM
 	model.add(LSTM(input_dim=1, output_dim=50, return_sequences=True))
 	model.add(Dropout(0.2))
@@ -76,16 +91,21 @@ def build_the_model():
 def subtract_the_mean(matrix_vix):
 	# shift all data by mean
 	matrix_vix = np.array(matrix_vix)
-	shifted_value = matrix_vix.mean()
-	matrix_vix -= shifted_value
-	print "Data  shape: ", matrix_vix.shape
-	return matrix_vix, shifted_value
 
+	shifted_value = matrix_vix.mean()
+	std_dev = matrix_vix.std()
+
+	matrix_vix -= shifted_value
+	matrix_vix = matrix_vix / std_dev
+
+	print "Data  shape: ", matrix_vix.shape
+
+	return matrix_vix, shifted_value
 
 def predict(df, sequence_length, asset):
 
  	# convert the vector to a 2D matrix
-	matrix_vix = convertSeriesToMatrix(df, sequence_length)
+	matrix_vix = np.array(convertSeriesToMatrix(df, sequence_length))
 
 	matrix_vix, shifted_value = subtract_the_mean(matrix_vix)
 
@@ -112,12 +132,12 @@ def predict(df, sequence_length, asset):
 	X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
 	X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
 
-	model = build_the_model()
+	model = build_the_model(asset)
 
 	# train the model
 	model.fit(X_train, y_train, batch_size=512, nb_epoch=50, validation_split=0.05, verbose=1)
 
-	# # evaluate the result
+	# evaluate the result
 	test_mse = model.evaluate(X_test, y_test, verbose=1)
 
 	# print "Full value of test_mse is {}".format(test_mse)
@@ -127,6 +147,9 @@ def predict(df, sequence_length, asset):
 	# get the predicted values
 	predicted_values = model.predict(X_test)
 	num_test_samples = len(predicted_values)
+
+	# print "Predicted values have a length of {} and look like {}".format(len(predicted_values), predicted_values)
+
 	predicted_values = np.reshape(predicted_values, (num_test_samples,1))
 
 	plot_and_save(y_test, shifted_value, predicted_values, asset)
